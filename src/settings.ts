@@ -104,7 +104,7 @@ export class SampleSettingTab extends PluginSettingTab {
 			nameInput.value = '';
 			
 			// Refresh the participants list display
-			participantsList.empty();
+			participantsList.empty ? participantsList.empty() : participantsList.replaceChildren();
 			this.renderParticipantsList(participantsList);
 		});
 		
@@ -125,7 +125,7 @@ export class SampleSettingTab extends PluginSettingTab {
 					.setCta()
 					.onClick(async () => {
 						await this.plugin.generateParticipantsFromVault();
-						participantsList.empty();
+						participantsList.empty ? participantsList.empty() : participantsList.replaceChildren();
 						this.renderParticipantsList(participantsList);
 						new Notice('Participants generated from vault');
 					}));
@@ -172,18 +172,22 @@ export class SampleSettingTab extends PluginSettingTab {
 	
 	// Method to render the participants list UI
 	private renderParticipantsList(container: HTMLElement) {
-		container.empty();
+		container.empty ? container.empty() : container.replaceChildren();
 		
 		if (this.plugin.settings.participants.length === 0) {
-			container.createEl('p', { text: 'No participants added yet.' });
+			container.createEl ? 
+				container.createEl('p', { text: 'No participants added yet.' }) : 
+				container.appendChild(Object.assign(document.createElement('p'), {textContent: 'No participants added yet.'}));
 			return;
 		}
 		
 		// Create a table-like structure for participants
-		const table = container.createEl('table', { cls: 'participant-list-table' });
+		const table = container.createEl ? 
+			container.createEl('table', { cls: 'participant-list-table' }) : 
+			container.appendChild(Object.assign(document.createElement('table'), {className: 'participant-list-table'}));
 		
 		// Add table header
-		const headerRow = table.createEl('thead').createEl('tr');
+		const headerRow = table.createEl ? table.createEl('tr') : table.appendChild(document.createElement('tr'));
 		headerRow.createEl('th', { text: 'ID' });
 		headerRow.createEl('th', { text: 'Name' });
 		headerRow.createEl('th', { text: 'Actions', attr: { style: 'width: 100px;' } });

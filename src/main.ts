@@ -1,6 +1,5 @@
-import {App, Editor, MarkdownView, Modal, Notice, Plugin, TFile, WorkspaceLeaf, EditorSuggest, EditorSuggestTriggerInfo, EditorPosition, Scope} from 'obsidian';
+import {App, Editor, MarkdownView, Modal, Notice, Plugin, TFile, WorkspaceLeaf, EditorSuggest, EditorSuggestTriggerInfo, EditorPosition, Scope, MarkdownPostProcessorContext} from 'obsidian';
 import {DEFAULT_SETTINGS, LocalUserData, MyPluginSettings, SampleSettingTab, Participant} from "./settings";
-import {Workspace} from "obsidian";
 
 interface MentionSuggestion {
 	id: string;
@@ -90,7 +89,7 @@ export default class MyPlugin extends Plugin {
 			
 			// If we identified a participant ID, check if it's the active user
 			if (participantId && this.localUserData.activeUserId && participantId === this.localUserData.activeUserId) {
-				anchorEl.addClass('active-user-mention');
+				anchorEl.classList.add('active-user-mention');
 			}
 		});
 	}
@@ -393,7 +392,7 @@ class SelectActiveUserModal extends Modal {
 			const selectedValue = dropdown.value;
 			if (selectedValue) {
 				this.onSelect(selectedValue);
-				this.close();
+				this.onClose();  // Use the proper Obsidian modal lifecycle method
 			} else {
 				new Notice('Please select a participant.');
 			}
@@ -404,7 +403,7 @@ class SelectActiveUserModal extends Modal {
 			const selectedValue = dropdown.value;
 			if (selectedValue) {
 				this.onSelect(selectedValue);
-				this.close();
+				this.onClose();  // Use the proper Obsidian modal lifecycle method
 			}
 		});
 	}
