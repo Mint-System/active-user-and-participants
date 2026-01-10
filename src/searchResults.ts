@@ -34,7 +34,7 @@ export class SearchResultModal extends Modal {
 			link.addEventListener('click', (evt) => {
 				evt.preventDefault();
 				// Open the file in the active leaf
-				this.app.workspace.getLeaf(true).openFile(file);
+				void this.app.workspace.getLeaf(true).openFile(file);
 				this.close();
 			});
 			

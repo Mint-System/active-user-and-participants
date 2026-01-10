@@ -1,12 +1,12 @@
 import {App, Notice, PluginSettingTab, Setting, TextAreaComponent} from "obsidian";
-import MyPlugin from "./main";
+import ActiveUserAndParticipantsPlugin from "./main";
 
 export interface Participant {
 	id: string;
 	name: string;
 }
 
-export interface MyPluginSettings {
+export interface ActiveUserAndParticipantsPluginSettings {
 	participants: Participant[];
 	autoUpdateMentions: boolean; // Feature flag for automatically updating mentions when participants change
 	// Note: activeUserId is now stored separately per user installation, not in shared settings
@@ -16,15 +16,15 @@ export interface LocalUserData {
 	activeUserId: string | null;
 }
 
-export const DEFAULT_SETTINGS: MyPluginSettings = {
+export const DEFAULT_SETTINGS: ActiveUserAndParticipantsPluginSettings = {
 	participants: [],
 	autoUpdateMentions: true  // Enabled by default as requested
 }
 
-export class SampleSettingTab extends PluginSettingTab {
-	plugin: MyPlugin;
+export class ActiveUserAndParticipantsSettingTab extends PluginSettingTab {
+	plugin: ActiveUserAndParticipantsPlugin;
 
-	constructor(app: App, plugin: MyPlugin) {
+	constructor(app: App, plugin: ActiveUserAndParticipantsPlugin) {
 		super(app, plugin);
 		this.plugin = plugin;
 	}
@@ -36,7 +36,7 @@ export class SampleSettingTab extends PluginSettingTab {
 
 		// Auto-update mentions toggle
 		new Setting(containerEl)
-			.setName('Auto-update Mentions')
+			.setName('Auto-update mentions')
 			.setDesc('Automatically update all mentions in vault when participant name or ID changes')
 			.addToggle(toggle => toggle
 				.setValue(this.plugin.settings.autoUpdateMentions)
@@ -47,8 +47,8 @@ export class SampleSettingTab extends PluginSettingTab {
 
 		// Create participant management section
 		new Setting(containerEl)
-			.setName('Add New Participant')
-			.setDesc('Enter ID and Name for a new participant');
+			.setName('Add new participant')
+			.setDesc('Enter ID and name for a new participant');
 		
 		// Create form for adding new participants
 		const addForm = containerEl.createDiv();
@@ -110,7 +110,7 @@ export class SampleSettingTab extends PluginSettingTab {
 		
 		// Create participants list section
 		new Setting(containerEl)
-			.setName('Existing Participants')
+			.setName('Existing participants')
 			.setDesc('Manage your existing participants');
 		
 		// Create a container for the participants list
@@ -121,7 +121,7 @@ export class SampleSettingTab extends PluginSettingTab {
 		if (this.plugin.settings.participants.length === 0) {
 			new Setting(containerEl)
 				.addButton(btn => btn
-					.setButtonText('Generate from Vault')
+					.setButtonText('Generate from vault')
 					.setCta()
 					.onClick(async () => {
 						await this.plugin.generateParticipantsFromVault();

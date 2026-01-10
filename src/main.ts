@@ -1,5 +1,5 @@
 import {App, CachedMetadata, Editor, MarkdownView, Modal, Notice, Plugin, TFile, WorkspaceLeaf, EditorSuggest, EditorSuggestTriggerInfo, EditorPosition, Scope, MarkdownPostProcessorContext} from 'obsidian';
-import {DEFAULT_SETTINGS, LocalUserData, MyPluginSettings, SampleSettingTab, Participant} from "./settings";
+import {DEFAULT_SETTINGS, LocalUserData, ActiveUserAndParticipantsPluginSettings, ActiveUserAndParticipantsSettingTab, Participant} from "./settings";
 import {SearchResultModal} from "./searchResults";
 
 interface MentionSuggestion {
@@ -8,8 +8,8 @@ interface MentionSuggestion {
 	isNew?: boolean;
 }
 
-export default class MyPlugin extends Plugin {
-	settings: MyPluginSettings;
+export default class ActiveUserAndParticipantsPlugin extends Plugin {
+	settings: ActiveUserAndParticipantsPluginSettings;
 	private localUserData: LocalUserData;
 	private mentionSuggest: MentionEditorSuggest;
 
@@ -17,7 +17,7 @@ export default class MyPlugin extends Plugin {
 		await this.loadSettings();
 
 		// Add a settings tab
-		this.addSettingTab(new SampleSettingTab(this.app, this));
+		this.addSettingTab(new ActiveUserAndParticipantsSettingTab(this.app, this));
 
 		// Register the mention suggestion provider
 		this.mentionSuggest = new MentionEditorSuggest(this.app, this);
@@ -162,13 +162,7 @@ export default class MyPlugin extends Plugin {
 			const resultMessage = `Found ${matchingFiles.length} note(s) with ${searchDescription}.`;
 			new Notice(resultMessage);
 			
-			// Log detailed results to console for debugging
-			console.log(`Mention search results for "${query}":`, {
-				query: query,
-				participantIdsToFind: participantIdsToFind,
-				matchingFiles: matchingFiles.map(f => f.path),
-				searchDescription: searchDescription
-			});
+
 			
 			// Create a modal to show detailed results
 			const resultModal = new SearchResultModal(this.app, matchingFiles, searchDescription);
@@ -183,7 +177,7 @@ export default class MyPlugin extends Plugin {
 		const links = element.querySelectorAll('a');
 		
 		links.forEach(link => {
-			const anchorEl = link as HTMLAnchorElement;
+			const anchorEl = link;
 			let participantId: string | null = null;
 			
 			// Check if it's a mention link (mention:// protocol)
@@ -220,7 +214,7 @@ export default class MyPlugin extends Plugin {
 	}
 
 	async loadSettings() {
-		const data = await this.loadData() as { settings?: MyPluginSettings, localUserData?: LocalUserData };
+		const data = await this.loadData() as { settings?: ActiveUserAndParticipantsPluginSettings, localUserData?: LocalUserData };
 		this.settings = Object.assign({}, DEFAULT_SETTINGS, data.settings || {});
 		this.localUserData = data.localUserData || { activeUserId: null };
 	}
@@ -349,9 +343,9 @@ export default class MyPlugin extends Plugin {
 
 
 class MentionEditorSuggest extends EditorSuggest<MentionSuggestion> {
-	private plugin: MyPlugin;
+	private plugin: ActiveUserAndParticipantsPlugin;
 
-	constructor(app: App, plugin: MyPlugin) {
+	constructor(app: App, plugin: ActiveUserAndParticipantsPlugin) {
 		super(app);
 		this.plugin = plugin;
 	}
@@ -452,7 +446,8 @@ class MentionEditorSuggest extends EditorSuggest<MentionSuggestion> {
 		
 		// Determine which format to use based on Obsidian's wikilink setting
 		// Check the "Use [[Wikilinks]]" setting in Obsidian
-		const useWikilinks = (this.app.vault as any).getConfig ? !(this.app.vault as any).getConfig('useMarkdownLinks') : true;
+		const vaultWithConfig = this.app.vault as any;
+		const useWikilinks = vaultWithConfig.getConfig ? !vaultWithConfig.getConfig('useMarkdownLinks') : true;
 		
 		let replacement: string;
 		if (useWikilinks) {
@@ -467,10 +462,10 @@ class MentionEditorSuggest extends EditorSuggest<MentionSuggestion> {
 }
 
 class MentionSearchModal extends Modal {
-	private plugin: MyPlugin;
+	private plugin: ActiveUserAndParticipantsPlugin;
 	private onSubmit: (query: string) => void;
 
-	constructor(app: App, plugin: MyPlugin, onSubmit: (query: string) => void) {
+	constructor(app: App, plugin: ActiveUserAndParticipantsPlugin, onSubmit: (query: string) => void) {
 		super(app);
 		this.plugin = plugin;
 		this.onSubmit = onSubmit;
