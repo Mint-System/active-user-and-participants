@@ -5,16 +5,19 @@ This plugin enables collaborative note-taking by managing vault participants and
 ## Features
 
 ### Participant Management
+
 - Manage a shared list of participants in YAML format
 - Participants have an ID and a display name 
 - Supports importing participants from existing mentions in the vault
 
 ### Active User Selection
+
 - Each user can set their own active user identity (stored per installation)
 - Multiple users of the same vault can each have their own active user
 - Change active user through command palette or modal selection
 
 ### @ Mention Tagging
+
 - Type `@` followed by a character to activate autocomplete suggestions
 - Suggests existing participants by name or ID
 - For non-existent participants, offers to create them on-the-fly
@@ -23,11 +26,9 @@ This plugin enables collaborative note-taking by managing vault participants and
   - When Wikilinks disabled: `@[Display Name](mention://participant-id)`
 
 ### Automatic Updates
+
 - When participant information changes in settings, all mentions in all vault files are automatically updated
 - Changes to name or ID are reflected across the entire vault
-
-### Dynamic Filtering (Future Enhancement Ready)
-- Supports `@me` filter in frontmatter for filtering by active user (implementation ready for future use)
 
 ## Installation
 
@@ -38,6 +39,7 @@ This plugin enables collaborative note-taking by managing vault participants and
 ## Usage
 
 ### Managing Participants
+
 1. Open Settings → Community Plugins → Active User and Participants
 2. Use the UI controls to manage participants:
    - Add participants using the "Add New Participant" form with ID and Name
@@ -46,10 +48,12 @@ This plugin enables collaborative note-taking by managing vault participants and
 3. Alternatively, click "Generate from Vault" (when participant list is empty) to auto-populate from existing mentions in the vault
 
 ### Setting Active User
+
 - Use the command palette (`Ctrl+P` or `Cmd+P`) and search for "Active User and Participants: Change Active User"
 - Or wait for the initial prompt when opening the vault if no active user is set
 
 ### Creating Mentions
+
 1. In any note, type `@` followed by a few characters
 2. Select from the suggested participants or choose "create new participant"
 3. The appropriate mention link will be inserted based on your wikilink settings

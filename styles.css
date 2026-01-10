@@ -1,0 +1,57 @@
+/*
+
+This CSS file will be included with your plugin, and
+available in the app when your plugin is enabled.
+
+If your plugin does not need CSS, delete this file.
+
+*/
+
+/* Active user mention styling */
+.active-user-mention {
+	background-color: var(--text-accent);
+	color: var(--text-on-accent);
+	padding: 1px 4px;
+	border-radius: 3px;
+	font-weight: bold;
+	text-decoration: none;
+}
+
+.active-user-mention:hover {
+	background-color: var(--text-accent-hover);
+}
+
+/* Participants management styles */
+.participant-add-form {
+	margin-bottom: 15px;
+	padding: 10px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 5px;
+}
+
+.participant-list-table {
+	width: 100%;
+	border-collapse: collapse;
+}
+
+.participant-list-table th,
+.participant-list-table td {
+	padding: 8px;
+	text-align: left;
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.participant-list-table input[type="text"] {
+	width: 100%;
+	box-sizing: border-box;
+	padding: 4px 8px;
+}
+
+.participant-list-table th {
+	font-weight: bold;
+	background-color: var(--background-secondary);
+}
+
+.participant-list-table tr:last-child td {
+	border-bottom: none;
+}
