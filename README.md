@@ -61,6 +61,33 @@ This plugin enables collaborative note-taking by managing vault participants and
 ## Commands
 
 - `Active User and Participants: Change Active User` - Opens modal to select your active user
+- `Active User and Participants: Search for Mentions of a Participant` - Opens a modal to search for all mentions of a specific participant by name/ID
+- `Active User and Participants: Search for Mentions of Me` - Searches for all mentions of the currently active user across the vault
+
+## Search Functionality
+
+The plugin provides powerful search capabilities to find @ mentions across your vault:
+
+### Mention-Based Search
+
+You can search for user mentions in two ways:
+
+1. **Search by User Name/ID**: Using the "Search for Mentions of a User" command, you can find all notes that contain mentions of a specific participant. Simply enter the participant's name or ID to search across your entire vault.
+
+2. **Search for Active User ("Me")**: Using the "Search for Mentions of Me" command, you can quickly find all mentions of your currently active user without having to enter any search terms.
+
+**Note**: Currently, the search functionality is accessed through Obsidian's Command Palette rather than directly in the search bar as a `mention:` operator. True search operator integration (like `mention:john` directly in the search bar) would require Obsidian to provide a public API for plugins to extend search operators, which is not currently available.
+
+### How It Works
+
+Both search methods scan all markdown files in your vault to find:
+
+- Wikilink format mentions: `@[[participant-id|Display Name]]`
+- Link format mentions: `@[Display Name](mention://participant-id)`
+
+The search is case-insensitive and will match partial names or IDs. For example, searching for "john" would find participants with names like "John Smith" or IDs like "john.doe".
+
+When you use the search feature, the plugin will report how many files contain the specified mentions, helping you quickly locate relevant notes.
 
 ## File Format Support
 

@@ -1,5 +1,6 @@
-import {App, Editor, MarkdownView, Modal, Notice, Plugin, TFile, WorkspaceLeaf, EditorSuggest, EditorSuggestTriggerInfo, EditorPosition, Scope, MarkdownPostProcessorContext} from 'obsidian';
+import {App, CachedMetadata, Editor, MarkdownView, Modal, Notice, Plugin, TFile, WorkspaceLeaf, EditorSuggest, EditorSuggestTriggerInfo, EditorPosition, Scope, MarkdownPostProcessorContext} from 'obsidian';
 import {DEFAULT_SETTINGS, LocalUserData, MyPluginSettings, SampleSettingTab, Participant} from "./settings";
+import {SearchResultModal} from "./searchResults";
 
 interface MentionSuggestion {
 	id: string;
@@ -54,7 +55,127 @@ export default class MyPlugin extends Plugin {
 			}
 		});
 		
-
+		// Add command to search for mentions of a participant
+		this.addCommand({
+			id: 'search-mentions-of-user',
+			name: 'Search for Mentions of a Participant',
+			callback: async () => {
+				// Create a modal for entering the search query
+				const searchModal = new MentionSearchModal(this.app, this, async (query) => {
+					await this.performMentionSearch(query);
+				});
+				searchModal.open();
+			}
+		});
+		
+		// Add command to search for mentions of active user ("me")
+		this.addCommand({
+			id: 'search-mentions-of-me',
+			name: 'Search for Mentions of Me',
+			callback: async () => {
+				await this.performMentionSearch("me");
+			}
+		});
+		
+		// Initialize search integration
+		this.initSearchIntegration();
+	}
+	
+	// Initialize search integration to handle mention queries
+	initSearchIntegration() {
+		// Currently using command-based approach for stability
+		// True search operator integration would require Obsidian to provide public API
+		// for extending search operators, which is not currently available
+	}
+	
+	// Method to perform mention search
+	async performMentionSearch(query: string) {
+		// Get all markdown files in the vault
+		const files = this.app.vault.getMarkdownFiles();
+		const matchingFiles = [];
+		
+		// Parse the query
+		let participantIdsToFind: string[] = [];
+		let searchDescription = `mentions of "${query}"`;
+		
+		if (query.toLowerCase() === "me") {
+			// If searching for "me", use the active user's ID
+			if (this.localUserData.activeUserId) {
+				const participant = this.settings.participants.find(p => p.id === this.localUserData.activeUserId);
+				if (participant) {
+					participantIdsToFind = [this.localUserData.activeUserId];
+					searchDescription = `mentions of "me" (${participant.name})`;
+				} else {
+					new Notice("You don't have an active user set. Please set your active user first.");
+					return;
+				}
+			} else {
+				new Notice("You don't have an active user set. Please set your active user first.");
+				return;
+			}
+		} else {
+			// Find participant by name or ID (case-insensitive)
+			const matchingParticipants = this.settings.participants.filter(p => 
+				p.name.toLowerCase().includes(query.toLowerCase()) || 
+				p.id.toLowerCase().includes(query.toLowerCase())
+			);
+			
+			if (matchingParticipants.length === 0) {
+				new Notice(`No participants found matching "${query}".`);
+				return;
+			}
+			
+			participantIdsToFind = matchingParticipants.map(p => p.id);
+			searchDescription = `mentions of "${query}"`;
+		}
+		
+		// Search through each file for the participant mentions
+		for (const file of files) {
+			const content = await this.app.vault.cachedRead(file);
+			
+			// Check if any of the matching participant IDs appear in the file content
+			let foundInFile = false;
+			for (const participantId of participantIdsToFind) {
+				// Check for wikilink format: @[[participantId|name]]
+				const wikilinkPattern = new RegExp(`@\\[\\[${participantId}\\|[^\\]]*\\]\\]`, 'gi');
+				if (wikilinkPattern.test(content)) {
+					foundInFile = true;
+					break;
+				}
+				
+				// Check for link format: @[name](mention://participantId)
+				const linkPattern = new RegExp(`@\\[[^\\]]*\\]\\(mention://${participantId}\\)`, 'gi');
+				if (linkPattern.test(content)) {
+					foundInFile = true;
+					break;
+				}
+			}
+			
+			if (foundInFile) {
+				matchingFiles.push(file);
+			}
+		}
+		
+		// Open search results in Obsidian's search panel if possible
+		// For now, we'll show a notice with the count and open the search tab
+		if (matchingFiles.length > 0) {
+			const resultMessage = `Found ${matchingFiles.length} note(s) with ${searchDescription}.`;
+			new Notice(resultMessage);
+			
+			// Log detailed results to console for debugging
+			console.log(`Mention search results for "${query}":`, {
+				query: query,
+				participantIdsToFind: participantIdsToFind,
+				matchingFiles: matchingFiles.map(f => f.path),
+				searchDescription: searchDescription
+			});
+			
+			// Create a modal to show detailed results
+			const resultModal = new SearchResultModal(this.app, matchingFiles, searchDescription);
+			resultModal.open();
+		} else {
+			new Notice(`No mentions found for ${searchDescription}. Checked ${files.length} files.`);
+		}
 	}
 	
 	processMentionsInHtml(element: HTMLElement) {
@@ -345,6 +466,81 @@ class MentionEditorSuggest extends EditorSuggest<MentionSuggestion> {
 	}
 }
 
+class MentionSearchModal extends Modal {
+	private plugin: MyPlugin;
+	private onSubmit: (query: string) => void;
+
+	constructor(app: App, plugin: MyPlugin, onSubmit: (query: string) => void) {
+		super(app);
+		this.plugin = plugin;
+		this.onSubmit = onSubmit;
+	}
+
+	onOpen() {
+		const { contentEl } = this;
+		contentEl.empty();
+		contentEl.createEl('h2', { text: 'Search for Mentions' });
+
+		// Create form for search input
+		const formContainer = contentEl.createDiv();
+		
+		formContainer.createEl('label', { 
+			text: 'Enter participant name or "me" for active user:', 
+			attr: { style: 'display: block; margin-bottom: 8px;' } 
+		});
+		
+		const input = formContainer.createEl('input', {
+			type: 'text',
+			placeholder: 'e.g. "john", "john.doe", or "me"',
+			attr: { style: 'width: 100%; padding: 8px; margin-bottom: 10px;' }
+		});
+		
+		// Example text
+		formContainer.createEl('small', { 
+			text: 'Examples: "mention: john" would search for all mentions of participants named John', 
+			attr: { style: 'display: block; margin-top: 4px; color: #888;' } 
+		});
+
+		// Submit button
+		const buttonContainer = formContainer.createDiv({ cls: 'modal-button-container' });
+		const submitButton = buttonContainer.createEl('button', { 
+			text: 'Search Mentions', 
+			cls: 'mod-cta' 
+		});
+		
+		submitButton.addEventListener('click', () => {
+			const query = input.value.trim();
+			if (query) {
+				this.onSubmit(query);
+				this.close();
+			} else {
+				new Notice('Please enter a name to search for.');
+			}
+		});
+
+		// Allow Enter key to submit
+		input.addEventListener('keypress', (evt) => {
+			if (evt.key === 'Enter') {
+				const query = input.value.trim();
+				if (query) {
+					this.onSubmit(query);
+					this.close();
+				} else {
+					new Notice('Please enter a name to search for.');
+				}
+			}
+		});
+
+		// Focus the input
+		input.focus();
+	}
+
+	onClose() {
+		const { contentEl } = this;
+		contentEl.empty();
+	}
+}
+
 class SelectActiveUserModal extends Modal {
 	private participants: Participant[];
 	private onSelect: (id: string) => void;
@@ -403,13 +599,14 @@ class SelectActiveUserModal extends Modal {
 			const selectedValue = dropdown.value;
 			if (selectedValue) {
 				this.onSelect(selectedValue);
-				this.onClose();  // Use the proper Obsidian modal lifecycle method
+				this.close();  // Use the proper Obsidian modal lifecycle method
 			}
 		});
 	}
 
 	onClose() {
-		const { contentEl } = this;
-		contentEl.empty();
+		// Properly close the modal without necessarily emptying content
+		// The modal will be destroyed anyway when closed
+		super.onClose();
 	}
 }
