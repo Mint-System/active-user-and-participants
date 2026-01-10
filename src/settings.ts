@@ -12,9 +12,7 @@ export interface ActiveUserAndParticipantsPluginSettings {
 	// Note: activeUserId is now stored separately per user installation, not in shared settings
 }
 
-export interface LocalUserData {
-	activeUserId: string | null;
-}
+
 
 export const DEFAULT_SETTINGS: ActiveUserAndParticipantsPluginSettings = {
 	participants: [],
@@ -46,6 +44,17 @@ export class ActiveUserAndParticipantsSettingTab extends PluginSettingTab {
 				}));
 
 		// Create participant management section
+		// Active User Selection Section
+		new Setting(containerEl)
+			.setName('Set Active User')
+			.setDesc('Select which participant represents you in this vault');
+		
+		const activeUserContainer = containerEl.createDiv();
+		this.renderActiveUserSelection(activeUserContainer);
+
+		// Add space before the next section
+		containerEl.createEl('div', { attr: { style: 'margin: 16px 0;' } });
+
 		new Setting(containerEl)
 			.setName('Add new participant')
 			.setDesc('Enter ID and name for a new participant');
@@ -95,7 +104,7 @@ export class ActiveUserAndParticipantsSettingTab extends PluginSettingTab {
 			this.plugin.settings.participants.push({ id, name });
 			
 			// Update mentions if needed (though this is a new participant, so no mentions to update)
-			this.updateChangedMentions(oldParticipants, this.plugin.settings.participants);
+			await this.updateChangedMentions(oldParticipants, this.plugin.settings.participants);
 			
 			await this.plugin.saveSettings();
 			
@@ -124,7 +133,9 @@ export class ActiveUserAndParticipantsSettingTab extends PluginSettingTab {
 					.setButtonText('Generate from vault')
 					.setCta()
 					.onClick(async () => {
+						const oldParticipants = [...this.plugin.settings.participants];
 						await this.plugin.generateParticipantsFromVault();
+						await this.updateChangedMentions(oldParticipants, this.plugin.settings.participants);
 						participantsList.empty ? participantsList.empty() : participantsList.replaceChildren();
 						this.renderParticipantsList(participantsList);
 						new Notice('Participants generated from vault');
@@ -135,7 +146,7 @@ export class ActiveUserAndParticipantsSettingTab extends PluginSettingTab {
 
 	
 	// Method to compare old and new participants to find changes and update mentions
-	private updateChangedMentions(oldParticipants: Participant[], newParticipants: Participant[]) {
+	private async updateChangedMentions(oldParticipants: Participant[], newParticipants: Participant[]) {
 		// Check if auto-update is enabled
 		if (!this.plugin.settings.autoUpdateMentions) {
 			return; // Skip updating mentions if feature is disabled
@@ -148,7 +159,7 @@ export class ActiveUserAndParticipantsSettingTab extends PluginSettingTab {
 			const newParticipant = newParticipants.find(p => p.id === oldParticipant.id);
 			if (newParticipant) {
 				if (oldParticipant.name !== newParticipant.name) {
-					const updatedCount = (this.plugin as any).updateMentionsForParticipant(oldParticipant.id, newParticipant.name, newParticipant.id);
+					const updatedCount = await this.plugin.updateMentionsForParticipant(oldParticipant.id, newParticipant.name, newParticipant.id);
 					totalUpdated += updatedCount;
 				}
 			}
@@ -160,7 +171,7 @@ export class ActiveUserAndParticipantsSettingTab extends PluginSettingTab {
 				p.name === oldParticipant.name && p.id !== oldParticipant.id
 			);
 			if (newParticipant) {
-				const updatedCount = (this.plugin as any).updateMentionsForParticipant(oldParticipant.id, newParticipant.name, newParticipant.id);
+				const updatedCount = await this.plugin.updateMentionsForParticipant(oldParticipant.id, newParticipant.name, newParticipant.id);
 				totalUpdated += updatedCount;
 			}
 		}
@@ -245,7 +256,7 @@ export class ActiveUserAndParticipantsSettingTab extends PluginSettingTab {
 				this.plugin.settings.participants.splice(index, 1);
 				
 				// Update mentions since a participant was removed
-				this.updateChangedMentions(oldParticipants, this.plugin.settings.participants);
+				await this.updateChangedMentions(oldParticipants, this.plugin.settings.participants);
 				await this.plugin.saveSettings();
 				
 				// Refresh the list
@@ -297,8 +308,68 @@ export class ActiveUserAndParticipantsSettingTab extends PluginSettingTab {
 			}
 			
 			// Update mentions since the participant changed
-			this.updateChangedMentions(oldParticipants, this.plugin.settings.participants);
+			await this.updateChangedMentions(oldParticipants, this.plugin.settings.participants);
 			await this.plugin.saveSettings();
 		}
+	}
+	
+	// Method to render the active user selection dropdown
+	private renderActiveUserSelection(container: HTMLElement) {
+		container.empty ? container.empty() : container.replaceChildren();
+		
+		// Create label
+		container.createEl('label', {
+			text: 'Select your active user:',
+			attr: { style: 'display: block; margin-bottom: 8px; font-weight: normal;' }
+		});
+
+		// Create dropdown for active user selection
+		const dropdownContainer = container.createDiv();
+		const dropdown = dropdownContainer.createEl('select', {
+			attr: { style: 'width: 100%; padding: 6px; margin-bottom: 8px;' }
+		});
+
+		// Create and add the default option
+		const defaultOption = document.createElement('option');
+		defaultOption.value = '';
+		defaultOption.textContent = 'Select your active user...';
+		dropdown.appendChild(defaultOption);
+
+		// Add options for each participant
+		this.plugin.settings.participants.forEach(participant => {
+			const option = document.createElement('option');
+			option.value = participant.id;
+			option.textContent = `${participant.name} (${participant.id})`;
+			dropdown.appendChild(option);
+		});
+
+		// Set current active user as selected
+		const currentActiveUserId = this.plugin.getActiveUserId();
+		if (currentActiveUserId) {
+			dropdown.value = currentActiveUserId;
+		}
+
+		// Add event listener to update active user
+		dropdown.addEventListener('change', async () => {
+			const selectedValue = dropdown.value;
+			if (selectedValue) {
+				await this.plugin.setActiveUser(selectedValue);
+				new Notice(`Active user set to: ${this.plugin.getActiveParticipant()?.name}`);
+			}
+		});
+
+		// Add a button to clear active user if needed
+		const clearButtonContainer = container.createDiv({ attr: { style: 'margin-top: 8px;' } });
+		const clearButton = clearButtonContainer.createEl('button', {
+			text: 'Clear Active User',
+			cls: 'mod-warning',
+			attr: { style: 'padding: 4px 8px; font-size: 0.9em;' }
+		});
+
+		clearButton.addEventListener('click', async () => {
+			await this.plugin.setActiveUser('');
+			dropdown.value = '';
+			new Notice('Active user cleared');
+		});
 	}
 }

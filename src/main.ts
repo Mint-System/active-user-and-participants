@@ -1,5 +1,5 @@
 import {App, CachedMetadata, Editor, MarkdownView, Modal, Notice, Plugin, TFile, WorkspaceLeaf, EditorSuggest, EditorSuggestTriggerInfo, EditorPosition, Scope, MarkdownPostProcessorContext} from 'obsidian';
-import {DEFAULT_SETTINGS, LocalUserData, ActiveUserAndParticipantsPluginSettings, ActiveUserAndParticipantsSettingTab, Participant} from "./settings";
+import {DEFAULT_SETTINGS, ActiveUserAndParticipantsPluginSettings, ActiveUserAndParticipantsSettingTab, Participant} from "./settings";
 import {SearchResultModal} from "./searchResults";
 
 interface MentionSuggestion {
@@ -8,13 +8,19 @@ interface MentionSuggestion {
 	isNew?: boolean;
 }
 
+// Define the interface for the external user mapping file
+interface ExternalUserMapping {
+	[computerUsername: string]: string | null; // Maps computer username to active user ID
+}
+
 export default class ActiveUserAndParticipantsPlugin extends Plugin {
 	settings: ActiveUserAndParticipantsPluginSettings;
-	private localUserData: LocalUserData;
+	private externalUserMapping: ExternalUserMapping;
 	private mentionSuggest: MentionEditorSuggest;
 
 	async onload() {
 		await this.loadSettings();
+		await this.loadExternalUserMapping();
 
 		// Add a settings tab
 		this.addSettingTab(new ActiveUserAndParticipantsSettingTab(this.app, this));
@@ -40,20 +46,13 @@ export default class ActiveUserAndParticipantsPlugin extends Plugin {
 
 		// Optionally prompt for active user when vault opens if not set
 		this.app.workspace.onLayoutReady(() => {
-			if (!this.localUserData.activeUserId && this.settings.participants.length > 0) {
-				// We could show a notice instead of forcing the modal
-				new Notice('Please select an active user in the plugin settings');
+			if (!this.getActiveUserId() && this.settings.participants.length > 0) {
+				// Show a notice directing users to the new settings location
+				new Notice('Please select an active user in the plugin settings (Settings → Active User and Participants → Set Active User)');
 			}
 		});
 
-		// Add command to change active user
-		this.addCommand({
-			id: 'change-active-user',
-			name: 'Change Active User',
-			callback: () => {
-				this.promptForActiveUser();
-			}
-		});
+
 		
 		// Add command to search for mentions of a participant
 		this.addCommand({
@@ -100,10 +99,11 @@ export default class ActiveUserAndParticipantsPlugin extends Plugin {
 		
 		if (query.toLowerCase() === "me") {
 			// If searching for "me", use the active user's ID
-			if (this.localUserData.activeUserId) {
-				const participant = this.settings.participants.find(p => p.id === this.localUserData.activeUserId);
+			const activeUserId = this.getActiveUserId();
+			if (activeUserId) {
+				const participant = this.settings.participants.find(p => p.id === activeUserId);
 				if (participant) {
-					participantIdsToFind = [this.localUserData.activeUserId];
+					participantIdsToFind = [activeUserId];
 					searchDescription = `mentions of "me" (${participant.name})`;
 				} else {
 					new Notice("You don't have an active user set. Please set your active user first.");
@@ -203,7 +203,8 @@ export default class ActiveUserAndParticipantsPlugin extends Plugin {
 			}
 			
 			// If we identified a participant ID, check if it's the active user
-			if (participantId && this.localUserData.activeUserId && participantId === this.localUserData.activeUserId) {
+			const activeUserId = this.getActiveUserId();
+			if (participantId && activeUserId && participantId === activeUserId) {
 				anchorEl.classList.add('active-user-mention');
 			}
 		});
@@ -218,19 +219,56 @@ export default class ActiveUserAndParticipantsPlugin extends Plugin {
 		if (!data) {
 			// Initialize with default settings if no saved data
 			this.settings = Object.assign({}, DEFAULT_SETTINGS);
-			this.localUserData = { activeUserId: null };
 		} else {
-			// Cast data and assign
-			const typedData = data as { settings?: ActiveUserAndParticipantsPluginSettings, localUserData?: LocalUserData };
+			// Cast data and assign (only settings are loaded from vault)
+			const typedData = data as { settings?: ActiveUserAndParticipantsPluginSettings };
 			this.settings = Object.assign({}, DEFAULT_SETTINGS, typedData.settings || {});
-			this.localUserData = typedData.localUserData || { activeUserId: null };
+		}
+	}
+
+	// Load the external user mapping file from outside the vault
+	async loadExternalUserMapping() {
+		try {
+			// Get the app's configuration directory path
+			const configDir = this.app.vault.configDir;
+			const filePath = `${configDir}/active-user-mapping.json`;
+			
+			// Read the mapping file if it exists
+			if (await this.app.vault.adapter.exists(filePath)) {
+				const fileContent = await this.app.vault.adapter.read(filePath);
+				this.externalUserMapping = JSON.parse(fileContent) as ExternalUserMapping;
+			} else {
+				// Initialize with empty mapping if file doesn't exist
+				this.externalUserMapping = {};
+			}
+		} catch (error) {
+			console.error("Error loading external user mapping:", error);
+			// Initialize with empty mapping on error
+			this.externalUserMapping = {};
+		}
+	}
+
+	// Save the external user mapping to a file outside the vault
+	async saveExternalUserMapping() {
+		try {
+			// Get the app's configuration directory path
+			const configDir = this.app.vault.configDir;
+			const filePath = `${configDir}/active-user-mapping.json`;
+			
+			// Write the mapping to the file
+			await this.app.vault.adapter.write(
+				filePath,
+				JSON.stringify(this.externalUserMapping, null, 2)
+			);
+		} catch (error) {
+			console.error("Error saving external user mapping:", error);
 		}
 	}
 
 	async saveSettings() {
+		// Only save settings to the vault (not local user data anymore)
 		await this.saveData({
-			settings: this.settings,
-			localUserData: this.localUserData
+			settings: this.settings
 		});
 	}
 
@@ -242,8 +280,7 @@ export default class ActiveUserAndParticipantsPlugin extends Plugin {
 
 		// Create a simple modal to select active user
 		new SelectActiveUserModal(this.app, this.settings.participants, async (selectedId: string) => {
-			this.localUserData.activeUserId = selectedId;
-			await this.saveSettings();
+			await this.setActiveUser(selectedId);
 			
 			const participant = this.settings.participants.find(p => p.id === selectedId);
 			if (participant) {
@@ -252,18 +289,42 @@ export default class ActiveUserAndParticipantsPlugin extends Plugin {
 		}).open();
 	}
 	
-	setActiveUser(userId: string) {
-		this.localUserData.activeUserId = userId;
-		return this.saveSettings(); // Save the local user data
+	// Get the current computer username/identifier
+	getComputerIdentifier(): string {
+		// In Obsidian desktop (Electron), we can try to get more specific user identification
+		// Although we can't directly access Node.js, we'll use what's available
+		try {
+			// In electron environments, we might have access to require function
+			if (typeof process !== 'undefined' && process.platform) {
+				// We can potentially use process.env to get user info
+				return process.env.USER || process.env.USERNAME || process.env.LOGNAME || "unknown_user";
+			} else {
+				// Fallback to a hash of some browser fingerprinting info if not in electron
+				return "unknown_user_" + Math.random().toString(36).substr(2, 9);
+			}
+		} catch (e) {
+			return "unknown_user_" + Math.random().toString(36).substr(2, 9);
+		}
+	}
+	
+	async setActiveUser(userId: string) {
+		// Get the computer identifier and update the mapping
+		const computerId = this.getComputerIdentifier();
+		this.externalUserMapping[computerId] = userId;
+		
+		// Save the updated mapping to the external file
+		await this.saveExternalUserMapping();
 	}
 	
 	getActiveUserId(): string | null {
-		return this.localUserData.activeUserId;
+		const computerId = this.getComputerIdentifier();
+		return this.externalUserMapping[computerId] || null;
 	}
 	
 	getActiveParticipant(): Participant | undefined {
-		if (!this.localUserData.activeUserId) return undefined;
-		return this.settings.participants.find(p => p.id === this.localUserData.activeUserId);
+		const activeUserId = this.getActiveUserId();
+		if (!activeUserId) return undefined;
+		return this.settings.participants.find(p => p.id === activeUserId);
 	}
 
 	async updateMentionsForParticipant(oldId: string, newName: string, newId: string): Promise<number> {

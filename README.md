@@ -49,8 +49,9 @@ This plugin enables collaborative note-taking by managing vault participants and
 
 ### Setting Active User
 
-- Use the command palette (`Ctrl+P` or `Cmd+P`) and search for "Active User and Participants: Change Active User"
-- Or wait for the initial prompt when opening the vault if no active user is set
+- Go to Settings → Community Plugins → Active User and Participants
+- Use the dropdown menu labeled "Set Active User" to select yourself from the participant list
+- Each user can maintain their individual active user selection without affecting others
 
 ### Creating Mentions
 
@@ -60,7 +61,6 @@ This plugin enables collaborative note-taking by managing vault participants and
 
 ## Commands
 
-- `Active User and Participants: Change Active User` - Opens modal to select your active user
 - `Active User and Participants: Search for Mentions of a Participant` - Opens a modal to search for all mentions of a specific participant by name/ID
 - `Active User and Participants: Search for Mentions of Me` - Searches for all mentions of the currently active user across the vault
 
@@ -95,6 +95,27 @@ The plugin recognizes and creates both formats depending on your Obsidian settin
 
 - **Wikilinks enabled**: Uses `@[[id|name]]` format
 - **Wikilinks disabled**: Uses `@[name](mention://id)` format
+
+## Changelog
+
+### Version 1.0.4
+- Moved active user selection to plugin settings (no longer stored in vault data)
+- Added active user dropdown directly in settings tab 
+- Removed redundant "Change Active User" command from command palette
+- Added ability to clear active user selection
+
+### Version 1.0.3
+- Added search functionality for mentions of specific participants
+- Added search functionality for mentions of active user ("me")
+- Fixed various bugs with mention processing
+
+### Version 1.0.2
+- Implemented automatic updating of mentions when participant information changes
+- Added participant management with add/edit/delete capabilities
+- Added ability to generate participants from existing mentions in vault
+
+### Version 1.0.1
+- Initial release with participant management and @ mention tagging
 
 ## Notes
 
