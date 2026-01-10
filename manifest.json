@@ -1,7 +1,7 @@
 {
 	"id": "active-participants",
 	"name": "Active User and Participants",
-	"version": "1.0.1",
+	"version": "1.0.2",
 	"minAppVersion": "0.15.0",
 	"description": "Manage vault participants and allow tagging them with @ mentions. Supports active user selection.",
 	"author": "Obsidian",
