@@ -214,9 +214,17 @@ export default class ActiveUserAndParticipantsPlugin extends Plugin {
 	}
 
 	async loadSettings() {
-		const data = await this.loadData() as { settings?: ActiveUserAndParticipantsPluginSettings, localUserData?: LocalUserData };
-		this.settings = Object.assign({}, DEFAULT_SETTINGS, data.settings || {});
-		this.localUserData = data.localUserData || { activeUserId: null };
+		const data = await this.loadData();
+		if (!data) {
+			// Initialize with default settings if no saved data
+			this.settings = Object.assign({}, DEFAULT_SETTINGS);
+			this.localUserData = { activeUserId: null };
+		} else {
+			// Cast data and assign
+			const typedData = data as { settings?: ActiveUserAndParticipantsPluginSettings, localUserData?: LocalUserData };
+			this.settings = Object.assign({}, DEFAULT_SETTINGS, typedData.settings || {});
+			this.localUserData = typedData.localUserData || { activeUserId: null };
+		}
 	}
 
 	async saveSettings() {
