@@ -21,9 +21,22 @@ export class SearchResultModal extends Modal {
 			return;
 		}
 		
+		// Sort files by last updated date (most recent first)
+		const sortedFiles = [...this.files].sort((a, b) => {
+			// Direct access to mtime property on TFile
+			const mtimeA = a.stat?.mtime;
+			const mtimeB = b.stat?.mtime;
+			
+			// If modification times exist, compare them; otherwise fallback to file path comparison
+			if (mtimeA !== undefined && mtimeB !== undefined) {
+				return mtimeB - mtimeA; // Descending order (most recent first)
+			}
+			return 0; // Maintain original order if stats unavailable
+		});
+		
 		const resultList = contentEl.createEl('ul');
 		
-		for (const file of this.files) {
+		for (const file of sortedFiles) {
 			const li = resultList.createEl('li', { cls: 'search-result-item' });
 			const link = li.createEl('a', { 
 				text: file.basename, 
@@ -43,6 +56,16 @@ export class SearchResultModal extends Modal {
 				text: file.path, 
 				cls: 'search-result-path' 
 			});
+			
+			// Add last modified date as tertiary info
+			const mtime = file.stat?.mtime;
+			if (mtime) {
+				const dateStr = new Date(mtime).toLocaleDateString();
+				li.createEl('div', { 
+					text: `Last updated: ${dateStr}`, 
+					cls: 'search-result-date' 
+				});
+			}
 		}
 		
 		// Add summary

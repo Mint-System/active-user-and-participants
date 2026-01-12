@@ -123,3 +123,11 @@ The plugin recognizes and creates both formats depending on your Obsidian settin
 - The active user selection is personal to each installation/user
 - When changing participant information, the plugin scans all markdown files in the vault to update mentions
 - Creating new participants on-the-fly adds them to the shared participants list
+
+## Future Enhancements
+
+- **Direct search bar integration**: Once Obsidian provides a public API for custom search operators, this plugin could support `mention:john` directly in the main search bar, eliminating the need for command palette access.
+- **Real-time collaboration indicators**: Show currently active participants in the vault in real-time using presence indicators.
+- **Mention statistics**: Track and display usage statistics for each participant's mentions.
+- **Bulk operations**: Add capabilities to perform bulk updates and management operations on participant mentions across multiple files simultaneously.
+- **Advanced sorting and filtering**: Enhanced search result views with advanced filtering and sorting options beyond the last updated date.
