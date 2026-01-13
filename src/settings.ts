@@ -6,10 +6,16 @@ export interface Participant {
 	name: string;
 }
 
+// Define the interface for the external user mapping
+export interface ExternalUserMapping {
+	[computerUsername: string]: string | null; // Maps computer username to active user ID
+}
+
 export interface ActiveUserAndParticipantsPluginSettings {
 	participants: Participant[];
 	autoUpdateMentions: boolean; // Feature flag for automatically updating mentions when participants change
 	// Note: activeUserId is now stored separately per user installation, not in shared settings
+	externalUserMapping?: ExternalUserMapping; // Store the external user mapping in the vault data
 }
 
 

@@ -1,5 +1,5 @@
 import {App, CachedMetadata, Editor, MarkdownView, Modal, Notice, Plugin, TFile, WorkspaceLeaf, EditorSuggest, EditorSuggestTriggerInfo, EditorPosition, Scope, MarkdownPostProcessorContext} from 'obsidian';
-import {DEFAULT_SETTINGS, ActiveUserAndParticipantsPluginSettings, ActiveUserAndParticipantsSettingTab, Participant} from "./settings";
+import {DEFAULT_SETTINGS, ActiveUserAndParticipantsPluginSettings, ActiveUserAndParticipantsSettingTab, Participant, ExternalUserMapping} from "./settings";
 import {SearchResultModal} from "./searchResults";
 
 interface MentionSuggestion {
@@ -8,19 +8,14 @@ interface MentionSuggestion {
 	isNew?: boolean;
 }
 
-// Define the interface for the external user mapping file
-interface ExternalUserMapping {
-	[computerUsername: string]: string | null; // Maps computer username to active user ID
-}
+
 
 export default class ActiveUserAndParticipantsPlugin extends Plugin {
 	settings: ActiveUserAndParticipantsPluginSettings;
-	private externalUserMapping: ExternalUserMapping;
 	private mentionSuggest: MentionEditorSuggest;
 
 	async onload() {
 		await this.loadSettings();
-		await this.loadExternalUserMapping();
 
 		// Add a settings tab
 		this.addSettingTab(new ActiveUserAndParticipantsSettingTab(this.app, this));
@@ -214,19 +209,7 @@ export default class ActiveUserAndParticipantsPlugin extends Plugin {
 		// Cleanup if needed
 	}
 
-	async loadSettings() {
-		const data = await this.loadData();
-		if (!data) {
-			// Initialize with default settings if no saved data
-			this.settings = Object.assign({}, DEFAULT_SETTINGS);
-		} else {
-			// Cast data and assign (only settings are loaded from vault)
-			const typedData = data as { settings?: ActiveUserAndParticipantsPluginSettings };
-			this.settings = Object.assign({}, DEFAULT_SETTINGS, typedData.settings || {});
-		}
-	}
-
-	// Load the external user mapping file from outside the vault
+	// Load the external user mapping file from outside the vault (for migration purposes)
 	async loadExternalUserMapping() {
 		try {
 			// Get the app's configuration directory path
@@ -236,37 +219,53 @@ export default class ActiveUserAndParticipantsPlugin extends Plugin {
 			// Read the mapping file if it exists
 			if (await this.app.vault.adapter.exists(filePath)) {
 				const fileContent = await this.app.vault.adapter.read(filePath);
-				this.externalUserMapping = JSON.parse(fileContent) as ExternalUserMapping;
-			} else {
-				// Initialize with empty mapping if file doesn't exist
-				this.externalUserMapping = {};
-			}
+				return JSON.parse(fileContent) as ExternalUserMapping;
+			} 
 		} catch (error) {
 			console.error("Error loading external user mapping:", error);
-			// Initialize with empty mapping on error
-			this.externalUserMapping = {};
 		}
+		return {};
 	}
-
-	// Save the external user mapping to a file outside the vault
-	async saveExternalUserMapping() {
-		try {
-			// Get the app's configuration directory path
-			const configDir = this.app.vault.configDir;
-			const filePath = `${configDir}/active-user-mapping.json`;
-			
-			// Write the mapping to the file
-			await this.app.vault.adapter.write(
-				filePath,
-				JSON.stringify(this.externalUserMapping, null, 2)
-			);
-		} catch (error) {
-			console.error("Error saving external user mapping:", error);
+	
+	async loadSettings() {
+		const data = await this.loadData();
+		if (!data) {
+			// Initialize with default settings if no saved data
+			this.settings = Object.assign({}, DEFAULT_SETTINGS);
+		} else {
+			// Cast data and assign (settings now include externalUserMapping)
+			const typedData = data as { settings?: ActiveUserAndParticipantsPluginSettings };
+			this.settings = Object.assign({}, DEFAULT_SETTINGS, typedData.settings || {});
+		}
+		
+		// Initialize externalUserMapping if it doesn't exist
+		if (!this.settings.externalUserMapping) {
+			this.settings.externalUserMapping = {};
+		}
+		
+		// Migrate from external file to vault data if needed
+		await this.migrateExternalUserMappingIfNeeded();
+	}
+	
+	// Migrate from external file to vault data if external file exists and vault data is empty
+	async migrateExternalUserMappingIfNeeded() {
+		if (Object.keys(this.settings.externalUserMapping!).length === 0) {
+			// If the vault mapping is empty, check if there's an external file to migrate from
+			const externalMapping = await this.loadExternalUserMapping();
+			if (Object.keys(externalMapping).length > 0) {
+				// Migrate the data from external file to vault data
+				this.settings.externalUserMapping = externalMapping;
+				await this.saveSettings();
+				
+				// Optionally, we could delete the external file after migration
+				// But for safety, we'll leave it in place for now
+				console.log("Migrated active user mapping from external file to vault data");
+			}
 		}
 	}
 
 	async saveSettings() {
-		// Only save settings to the vault (not local user data anymore)
+		// Save settings to the vault (now includes externalUserMapping)
 		await this.saveData({
 			settings: this.settings
 		});
@@ -308,17 +307,17 @@ export default class ActiveUserAndParticipantsPlugin extends Plugin {
 	}
 	
 	async setActiveUser(userId: string) {
-		// Get the computer identifier and update the mapping
+		// Get the computer identifier and update the mapping in settings
 		const computerId = this.getComputerIdentifier();
-		this.externalUserMapping[computerId] = userId;
+		this.settings.externalUserMapping![computerId] = userId;
 		
-		// Save the updated mapping to the external file
-		await this.saveExternalUserMapping();
+		// Save the updated settings
+		await this.saveSettings();
 	}
 	
 	getActiveUserId(): string | null {
 		const computerId = this.getComputerIdentifier();
-		return this.externalUserMapping[computerId] || null;
+		return this.settings.externalUserMapping?.[computerId] || null;
 	}
 	
 	getActiveParticipant(): Participant | undefined {
