@@ -1,6 +1,6 @@
 {
 	"name": "active-user-and-participants",
-	"version": "1.1.0",
+	"version": "1.1.1",
 	"description": "Manage vault participants and allow tagging them with @ mentions. Supports active user selection.",
 	"main": "main.js",
 	"type": "module",

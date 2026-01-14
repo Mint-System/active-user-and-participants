@@ -132,21 +132,19 @@ export class ActiveUserAndParticipantsSettingTab extends PluginSettingTab {
 		const participantsList = containerEl.createDiv();
 		this.renderParticipantsList(participantsList);
 		
-		// Generate from vault button
-		if (this.plugin.settings.participants.length === 0) {
-			new Setting(containerEl)
-				.addButton(btn => btn
-					.setButtonText('Generate from vault')
-					.setCta()
-					.onClick(async () => {
-						const oldParticipants = [...this.plugin.settings.participants];
-						await this.plugin.generateParticipantsFromVault();
-						await this.updateChangedMentions(oldParticipants, this.plugin.settings.participants);
-						participantsList.empty ? participantsList.empty() : participantsList.replaceChildren();
-						this.renderParticipantsList(participantsList);
-						new Notice('Participants generated from vault');
-					}));
-		}
+		// Update from vault button - always show regardless of participant list length
+		new Setting(containerEl)
+			.addButton(btn => btn
+				.setButtonText('Update from Vault')
+				.setCta()
+				.onClick(async () => {
+					const oldParticipants = [...this.plugin.settings.participants];
+					await this.plugin.generateParticipantsFromVault();
+					await this.updateChangedMentions(oldParticipants, this.plugin.settings.participants);
+					participantsList.empty ? participantsList.empty() : participantsList.replaceChildren();
+					this.renderParticipantsList(participantsList);
+					new Notice('Participants updated from vault');
+				}));
 	}
 	
 

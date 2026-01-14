@@ -362,6 +362,11 @@ export default class ActiveUserAndParticipantsPlugin extends Plugin {
 	async generateParticipantsFromVault() {
 		const participantsMap = new Map<string, string>(); // id -> name
 		
+		// Add existing participants to the map first to preserve them
+		for (const participant of this.settings.participants) {
+			participantsMap.set(participant.id, participant.name);
+		}
+		
 		// Scan all markdown files in the vault for mention links
 		const files = this.app.vault.getMarkdownFiles();
 		
