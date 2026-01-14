@@ -1,5 +1,5 @@
 {
-	"id": "active-participants",
+	"id": "active-user-and-participants",
 	"name": "Active User and Participants",
 	"version": "1.2.0",
 	"minAppVersion": "0.15.0",
