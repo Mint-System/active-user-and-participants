@@ -124,6 +124,45 @@ The plugin recognizes and creates both formats depending on your Obsidian settin
 - When changing participant information, the plugin scans all markdown files in the vault to update mentions
 - Creating new participants on-the-fly adds them to the shared participants list
 
+## Integration with External Plugins
+
+The plugin exposes public methods that allow other plugins to access the participant list:
+
+### For QuickAdd Integration
+
+You can now access the participant list from QuickAdd templates to dynamically populate your checkbox prompts:
+
+```javascript
+// Access the plugin instance
+const plugin = this.app.plugins.plugins['active-user-and-participants'];
+
+if (plugin) {
+  // Get participant names from the plugin
+  const participantNames = plugin.getParticipantNames();
+  
+  // Use in your checkbox prompt
+  const selectedParticipants = await this.quickAddApi.checkboxPrompt(participantNames);
+
+  const participantsYaml = selectedParticipants.map(p => `  - ${p}`).join('\n');
+
+  this.variables.participants = participantsYaml;
+} else {
+  // Fallback to hardcoded list if plugin isn't available
+  const selectedParticipants = await this.quickAddApi.checkboxPrompt(
+    ["Kurt", "Ulrich", "Marco", "Janik", "Gerit", "Bruno", "Astrid", "Laurens"]
+  );
+
+  const participantsYaml = selectedParticipants.map(p => `  - ${p}`).join('\n');
+
+  this.variables.participants = participantsYaml;
+}
+```
+
+#### Public Methods Available
+
+- `getParticipants()`: Returns an array of Participant objects with id and name properties
+- `getParticipantNames()`: Returns an array of participant names as strings
+
 ## Future Enhancements
 
 - **Direct search bar integration**: Once Obsidian provides a public API for custom search operators, this plugin could support `mention:john` directly in the main search bar, eliminating the need for command palette access.

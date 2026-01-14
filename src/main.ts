@@ -411,6 +411,22 @@ export default class ActiveUserAndParticipantsPlugin extends Plugin {
 		// which is out of scope for this plugin's complexity level.
 		// The primary highlighting occurs in preview mode with the post-processor.
 	}
+	
+	/**
+	 * Public method to retrieve the full list of participants for external access (e.g., QuickAdd integration)
+	 * @returns Array of Participant objects with id and name properties
+	 */
+	getParticipants(): Participant[] {
+		return this.settings.participants;
+	}
+	
+	/**
+	 * Public method to retrieve only participant names for external access (e.g., QuickAdd integration)
+	 * @returns Array of participant names as strings
+	 */
+	getParticipantNames(): string[] {
+		return this.settings.participants.map(p => p.name);
+	}
 }
 
 
