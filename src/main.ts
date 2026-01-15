@@ -433,6 +433,7 @@ export default class ActiveUserAndParticipantsPlugin extends Plugin {
 
 class MentionEditorSuggest extends EditorSuggest<MentionSuggestion> {
 	private plugin: ActiveUserAndParticipantsPlugin;
+	private suppressNextTrigger: boolean = false;
 
 	constructor(app: App, plugin: ActiveUserAndParticipantsPlugin) {
 		super(app);
@@ -440,6 +441,12 @@ class MentionEditorSuggest extends EditorSuggest<MentionSuggestion> {
 	}
 
 	onTrigger(cursor: EditorPosition, editor: Editor, file: TFile | null): EditorSuggestTriggerInfo | null {
+		// If we just inserted a mention, suppress the next trigger to prevent showing suggestions again
+		if (this.suppressNextTrigger) {
+			this.suppressNextTrigger = false;
+			return null;
+		}
+		
 		const currentLine = editor.getLine(cursor.line);
 		const beforeCursor = currentLine.slice(0, cursor.ch);
 
@@ -547,6 +554,9 @@ class MentionEditorSuggest extends EditorSuggest<MentionSuggestion> {
 		
 		// Replace the matched text
 		editor.replaceRange(replacement, { line: cursor.line, ch: startCh }, { line: cursor.line, ch: endCh });
+		
+		// Suppress the next trigger to prevent the suggestion from appearing again immediately after insertion
+		this.suppressNextTrigger = true;
 	}
 }
 
