@@ -1,4 +1,4 @@
-import {App, CachedMetadata, Editor, MarkdownView, Modal, Notice, Plugin, TFile, WorkspaceLeaf, EditorSuggest, EditorSuggestTriggerInfo, EditorPosition, Scope, MarkdownPostProcessorContext} from 'obsidian';
+import {App, Editor, MarkdownView, Modal, Notice, Plugin, TFile, EditorSuggest, EditorSuggestTriggerInfo, EditorPosition} from 'obsidian';
 import {DEFAULT_SETTINGS, ActiveUserAndParticipantsPluginSettings, ActiveUserAndParticipantsSettingTab, Participant, ExternalUserMapping} from "./settings";
 import {SearchResultModal} from "./searchResults";
 
@@ -43,7 +43,8 @@ export default class ActiveUserAndParticipantsPlugin extends Plugin {
 		this.app.workspace.onLayoutReady(() => {
 			if (!this.getActiveUserId() && this.settings.participants.length > 0) {
 				// Show a notice directing users to the new settings location
-				new Notice('Please select an active user in the plugin settings (Settings → Active User and Participants → Set Active User)');
+				// eslint-disable-next-line obsidianmd/ui/sentence-case
+				new Notice('Select active user in the plugin settings (Settings → Active user and participants → Set active user)');
 			}
 		});
 
@@ -52,11 +53,11 @@ export default class ActiveUserAndParticipantsPlugin extends Plugin {
 		// Add command to search for mentions of a participant
 		this.addCommand({
 			id: 'search-mentions-of-user',
-			name: 'Search for Mentions of a Participant',
+			name: 'Search for mentions of a participant',
 			callback: async () => {
 				// Create a modal for entering the search query
-				const searchModal = new MentionSearchModal(this.app, this, async (query) => {
-					await this.performMentionSearch(query);
+				const searchModal = new MentionSearchModal(this.app, this, (query) => {
+					void this.performMentionSearch(query);
 				});
 				searchModal.open();
 			}
@@ -65,7 +66,7 @@ export default class ActiveUserAndParticipantsPlugin extends Plugin {
 		// Add command to search for mentions of active user ("me")
 		this.addCommand({
 			id: 'search-mentions-of-me',
-			name: 'Search for Mentions of Me',
+			name: 'Search for mentions of me',
 			callback: async () => {
 				await this.performMentionSearch("me");
 			}
@@ -228,7 +229,7 @@ export default class ActiveUserAndParticipantsPlugin extends Plugin {
 	}
 	
 	async loadSettings() {
-		const data = await this.loadData();
+		const data: unknown = await this.loadData();
 		if (!data) {
 			// Initialize with default settings if no saved data
 			this.settings = Object.assign({}, DEFAULT_SETTINGS);
@@ -259,7 +260,7 @@ export default class ActiveUserAndParticipantsPlugin extends Plugin {
 				
 				// Optionally, we could delete the external file after migration
 				// But for safety, we'll leave it in place for now
-				console.log("Migrated active user mapping from external file to vault data");
+				console.debug("Migrated active user mapping from external file to vault data");
 			}
 		}
 	}
@@ -278,13 +279,13 @@ export default class ActiveUserAndParticipantsPlugin extends Plugin {
 		}
 
 		// Create a simple modal to select active user
-		new SelectActiveUserModal(this.app, this.settings.participants, async (selectedId: string) => {
-			await this.setActiveUser(selectedId);
-			
-			const participant = this.settings.participants.find(p => p.id === selectedId);
-			if (participant) {
-				new Notice(`Active user set to: ${participant.name}`);
-			}
+		new SelectActiveUserModal(this.app, this.settings.participants, (selectedId: string) => {
+			void this.setActiveUser(selectedId).then(() => {
+				const participant = this.settings.participants.find(p => p.id === selectedId);
+				if (participant) {
+					new Notice(`Active user set to: ${participant.name}`);
+				}
+			});
 		}).open();
 	}
 	
@@ -292,17 +293,21 @@ export default class ActiveUserAndParticipantsPlugin extends Plugin {
 	getComputerIdentifier(): string {
 		// In Obsidian desktop (Electron), we can try to get more specific user identification
 		// Although we can't directly access Node.js, we'll use what's available
+		type ObsidianProcess = {
+			platform?: string;
+			env: Record<string, string | undefined>;
+		};
 		try {
-			// In electron environments, we might have access to require function
-			if (typeof process !== 'undefined' && process.platform) {
-				// We can potentially use process.env to get user info
-				return process.env.USER || process.env.USERNAME || process.env.LOGNAME || "unknown_user";
-			} else {
-				// Fallback to a hash of some browser fingerprinting info if not in electron
-				return "unknown_user_" + Math.random().toString(36).substr(2, 9);
+			if (typeof globalThis.process !== 'undefined') {
+				const proc = globalThis.process as ObsidianProcess;
+				if (proc.platform) {
+					return proc.env.USER || proc.env.USERNAME || proc.env.LOGNAME || "unknown_user";
+				}
 			}
-		} catch (e) {
-			return "unknown_user_" + Math.random().toString(36).substr(2, 9);
+			// Fallback to a hash of some browser fingerprinting info if not in electron
+			return "unknown_user_" + Math.random().toString(36).slice(2, 11);
+		} catch {
+			return "unknown_user_" + Math.random().toString(36).slice(2, 11);
 		}
 	}
 	
@@ -385,7 +390,7 @@ export default class ActiveUserAndParticipantsPlugin extends Plugin {
 			}
 			
 			// Match @[name](mention://id) format
-			const mentionLinkRegex = /@\[([^\]]+)\]\(mention:\/\/([^\)]+)\)/g;
+			const mentionLinkRegex = /@\[([^\]]+)\]\(mention:\/\/([^)]+)\)/g;
 			while ((match = mentionLinkRegex.exec(content)) !== null) {
 				const name = match[1];
 				const id = match[2];
@@ -530,10 +535,10 @@ class MentionEditorSuggest extends EditorSuggest<MentionSuggestion> {
 
 	selectSuggestion(suggestion: MentionSuggestion, evt: KeyboardEvent | MouseEvent): void {
 		// Replace the @... text with the proper mention format
-		const leaf = this.app.workspace.activeLeaf;
-		if (!leaf || !(leaf.view instanceof MarkdownView)) return;
+		const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+		if (!view) return;
 
-		const editor = leaf.view.editor;
+		const editor = view.editor;
 
 		// Find the @ trigger position
 		const cursor = editor.getCursor();
@@ -550,6 +555,7 @@ class MentionEditorSuggest extends EditorSuggest<MentionSuggestion> {
 			const newId = suggestion.id.substring(4); // Remove 'NEW:' prefix
 
 			// Ask user if they want to create this participant
+			// eslint-disable-next-line no-alert
 			const shouldCreate = confirm(`"${suggestion.name}" is not in the participants list. Would you like to add them?`);
 			if (!shouldCreate) {
 				return; // User chose not to create, so just insert the text as-is
@@ -565,7 +571,7 @@ class MentionEditorSuggest extends EditorSuggest<MentionSuggestion> {
 			const exists = this.plugin.settings.participants.some(p => p.id === newParticipant.id || p.name === newParticipant.name);
 			if (!exists) {
 				this.plugin.settings.participants.push(newParticipant);
-				this.plugin.saveSettings();
+				void this.plugin.saveSettings();
 			}
 
 			// Update the suggestion object to use the actual values without prefix
@@ -574,8 +580,11 @@ class MentionEditorSuggest extends EditorSuggest<MentionSuggestion> {
 
 		// Determine which format to use based on Obsidian's wikilink setting
 		// Check the "Use [[Wikilinks]]" setting in Obsidian
-		const vaultWithConfig = this.app.vault as any;
-		const useWikilinks = vaultWithConfig.getConfig ? !vaultWithConfig.getConfig('useMarkdownLinks') : true;
+		interface VaultWithConfig {
+			getConfig?(key: string): unknown;
+		}
+		const vaultWithConfig = this.app.vault as VaultWithConfig;
+		const useWikilinks = vaultWithConfig.getConfig ? !(vaultWithConfig.getConfig('useMarkdownLinks') as boolean) : true;
 
 		let replacement: string;
 		if (useWikilinks) {
@@ -605,7 +614,7 @@ class MentionSearchModal extends Modal {
 	onOpen() {
 		const { contentEl } = this;
 		contentEl.empty();
-		contentEl.createEl('h2', { text: 'Search for Mentions' });
+		contentEl.createEl('h2', { text: 'Search for mentions' });
 
 		// Create form for search input
 		const formContainer = contentEl.createDiv();
@@ -622,15 +631,16 @@ class MentionSearchModal extends Modal {
 		});
 		
 		// Example text
-		formContainer.createEl('small', { 
-			text: 'Examples: "mention: john" would search for all mentions of participants named John', 
+		formContainer.createEl('small', {
+			// eslint-disable-next-line obsidianmd/ui/sentence-case
+			text: 'For example, searching for "john" finds participants named John.', 
 			attr: { style: 'display: block; margin-top: 4px; color: #888;' } 
 		});
 
 		// Submit button
 		const buttonContainer = formContainer.createDiv({ cls: 'modal-button-container' });
 		const submitButton = buttonContainer.createEl('button', { 
-			text: 'Search Mentions', 
+			text: 'Search mentions', 
 			cls: 'mod-cta' 
 		});
 		
@@ -640,7 +650,7 @@ class MentionSearchModal extends Modal {
 				this.onSubmit(query);
 				this.close();
 			} else {
-				new Notice('Please enter a name to search for.');
+				new Notice('Enter a name to search for.');
 			}
 		});
 
@@ -652,7 +662,7 @@ class MentionSearchModal extends Modal {
 					this.onSubmit(query);
 					this.close();
 				} else {
-					new Notice('Please enter a name to search for.');
+					new Notice('Enter a name to search for.');
 				}
 			}
 		});
@@ -680,7 +690,7 @@ class SelectActiveUserModal extends Modal {
 	onOpen() {
 		const { contentEl } = this;
 		contentEl.empty();
-		contentEl.createEl('h2', { text: 'Select Active User' });
+		contentEl.createEl('h2', { text: 'Select active user' });
 
 		if (this.participants.length === 0) {
 			contentEl.createEl('p', { text: 'No participants available.' });
@@ -689,7 +699,7 @@ class SelectActiveUserModal extends Modal {
 
 		// Create dropdown for participant selection
 		const dropdownContainer = contentEl.createEl('div', { cls: 'dropdown-container' });
-		dropdownContainer.createEl('label', { text: 'Choose active user:' });
+		dropdownContainer.createEl('label', { text: 'Select active user:' });
 		
 		const dropdown = dropdownContainer.createEl('select');
 		
@@ -716,7 +726,7 @@ class SelectActiveUserModal extends Modal {
 				this.onSelect(selectedValue);
 				this.onClose();  // Use the proper Obsidian modal lifecycle method
 			} else {
-				new Notice('Please select a participant.');
+				new Notice('Select a participant.');
 			}
 		});
 

@@ -1,4 +1,4 @@
-import {App, Notice, PluginSettingTab, Setting, TextAreaComponent} from "obsidian";
+import {App, Notice, PluginSettingTab, Setting} from "obsidian";
 import ActiveUserAndParticipantsPlugin from "./main";
 
 export interface Participant {
@@ -52,7 +52,7 @@ export class ActiveUserAndParticipantsSettingTab extends PluginSettingTab {
 		// Create participant management section
 		// Active User Selection Section
 		new Setting(containerEl)
-			.setName('Set Active User')
+			.setName('Set active user')
 			.setDesc('Select which participant represents you in this vault');
 		
 		const activeUserContainer = containerEl.createDiv();
@@ -85,23 +85,23 @@ export class ActiveUserAndParticipantsSettingTab extends PluginSettingTab {
 		
 		// Add button
 		const addButton = addForm.createEl('button', {
-			text: 'Add Participant',
+			text: 'Add participant',
 			attr: { style: 'margin-top: 8px;' }
 		});
 		
-		addButton.addEventListener('click', async () => {
+		addButton.addEventListener('click', () => {
 			const id = idInput.value.trim();
 			const name = nameInput.value.trim();
 			
 			if (!id || !name) {
-				new Notice('Please enter both ID and Name');
+				new Notice('Enter both ID and name');
 				return;
 			}
 			
 			// Check if participant already exists
 			const exists = this.plugin.settings.participants.some(p => p.id === id || p.name === name);
 			if (exists) {
-				new Notice('A participant with this ID or Name already exists');
+				new Notice('A participant with this ID or name already exists');
 				return;
 			}
 			
@@ -110,16 +110,20 @@ export class ActiveUserAndParticipantsSettingTab extends PluginSettingTab {
 			this.plugin.settings.participants.push({ id, name });
 			
 			// Update mentions if needed (though this is a new participant, so no mentions to update)
-			await this.updateChangedMentions(oldParticipants, this.plugin.settings.participants);
+			void this.updateChangedMentions(oldParticipants, this.plugin.settings.participants);
 			
-			await this.plugin.saveSettings();
+			void this.plugin.saveSettings();
 			
 			// Clear inputs
 			idInput.value = '';
 			nameInput.value = '';
 			
 			// Refresh the participants list display
-			participantsList.empty ? participantsList.empty() : participantsList.replaceChildren();
+			if (participantsList.empty) {
+				participantsList.empty();
+			} else {
+				participantsList.replaceChildren();
+			}
 			this.renderParticipantsList(participantsList);
 		});
 		
@@ -135,15 +139,20 @@ export class ActiveUserAndParticipantsSettingTab extends PluginSettingTab {
 		// Update from vault button - always show regardless of participant list length
 		new Setting(containerEl)
 			.addButton(btn => btn
-				.setButtonText('Update from Vault')
+				.setButtonText('Update from vault')
 				.setCta()
-				.onClick(async () => {
+				.onClick(() => {
 					const oldParticipants = [...this.plugin.settings.participants];
-					await this.plugin.generateParticipantsFromVault();
-					await this.updateChangedMentions(oldParticipants, this.plugin.settings.participants);
-					participantsList.empty ? participantsList.empty() : participantsList.replaceChildren();
-					this.renderParticipantsList(participantsList);
-					new Notice('Participants updated from vault');
+					void this.plugin.generateParticipantsFromVault().then(async () => {
+						await this.updateChangedMentions(oldParticipants, this.plugin.settings.participants);
+						if (participantsList.empty) {
+							participantsList.empty();
+						} else {
+							participantsList.replaceChildren();
+						}
+						this.renderParticipantsList(participantsList);
+						new Notice('Participants updated from vault');
+					});
 				}));
 	}
 	
@@ -187,19 +196,28 @@ export class ActiveUserAndParticipantsSettingTab extends PluginSettingTab {
 	
 	// Method to render the participants list UI
 	private renderParticipantsList(container: HTMLElement) {
-		container.empty ? container.empty() : container.replaceChildren();
+		if (container.empty) {
+			container.empty();
+		} else {
+			container.replaceChildren();
+		}
 		
 		if (this.plugin.settings.participants.length === 0) {
-			container.createEl ? 
-				container.createEl('p', { text: 'No participants added yet.' }) : 
+			if (container.createEl) {
+				container.createEl('p', { text: 'No participants added yet.' });
+			} else {
 				container.appendChild(Object.assign(document.createElement('p'), {textContent: 'No participants added yet.'}));
+			}
 			return;
 		}
 		
 		// Create a table-like structure for participants
-		const table = container.createEl ? 
-			container.createEl('table', { cls: 'participant-list-table' }) : 
-			container.appendChild(Object.assign(document.createElement('table'), {className: 'participant-list-table'}));
+		let table: HTMLElement;
+		if (container.createEl) {
+			table = container.createEl('table', { cls: 'participant-list-table' });
+		} else {
+			table = container.appendChild(Object.assign(document.createElement('table'), {className: 'participant-list-table'}));
+		}
 		
 		// Add table header
 		const headerRow = table.createEl ? table.createEl('tr') : table.appendChild(document.createElement('tr'));
@@ -237,35 +255,36 @@ export class ActiveUserAndParticipantsSettingTab extends PluginSettingTab {
 			});
 			
 			// Add event listeners
-			idInput.addEventListener('change', async (e) => {
-				await this.handleParticipantUpdate(index, 'id', (e.target as HTMLInputElement).value);
+			idInput.addEventListener('change', (e) => {
+				void this.handleParticipantUpdate(index, 'id', (e.target as HTMLInputElement).value);
 			});
 			
-			idInput.addEventListener('blur', async (e) => {
-				await this.handleParticipantUpdate(index, 'id', (e.target as HTMLInputElement).value);
+			idInput.addEventListener('blur', (e) => {
+				void this.handleParticipantUpdate(index, 'id', (e.target as HTMLInputElement).value);
 			});
 			
-			nameInput.addEventListener('change', async (e) => {
-				await this.handleParticipantUpdate(index, 'name', (e.target as HTMLInputElement).value);
+			nameInput.addEventListener('change', (e) => {
+				void this.handleParticipantUpdate(index, 'name', (e.target as HTMLInputElement).value);
 			});
 			
-			nameInput.addEventListener('blur', async (e) => {
-				await this.handleParticipantUpdate(index, 'name', (e.target as HTMLInputElement).value);
+			nameInput.addEventListener('blur', (e) => {
+				void this.handleParticipantUpdate(index, 'name', (e.target as HTMLInputElement).value);
 			});
 			
-			deleteBtn.addEventListener('click', async () => {
+			deleteBtn.addEventListener('click', () => {
 				if (index >= this.plugin.settings.participants.length) return;
 				
 				const oldParticipants = [...this.plugin.settings.participants];
 				this.plugin.settings.participants.splice(index, 1);
 				
 				// Update mentions since a participant was removed
-				await this.updateChangedMentions(oldParticipants, this.plugin.settings.participants);
-				await this.plugin.saveSettings();
-				
-				// Refresh the list
-				container.empty();
-				this.renderParticipantsList(container);
+				void this.updateChangedMentions(oldParticipants, this.plugin.settings.participants).then(async () => {
+					await this.plugin.saveSettings();
+					
+					// Refresh the list
+					container.empty();
+					this.renderParticipantsList(container);
+				});
 			});
 		});
 	}
@@ -319,7 +338,11 @@ export class ActiveUserAndParticipantsSettingTab extends PluginSettingTab {
 	
 	// Method to render the active user selection dropdown
 	private renderActiveUserSelection(container: HTMLElement) {
-		container.empty ? container.empty() : container.replaceChildren();
+		if (container.empty) {
+			container.empty();
+		} else {
+			container.replaceChildren();
+		}
 		
 		// Create label
 		container.createEl('label', {
@@ -354,26 +377,28 @@ export class ActiveUserAndParticipantsSettingTab extends PluginSettingTab {
 		}
 
 		// Add event listener to update active user
-		dropdown.addEventListener('change', async () => {
+		dropdown.addEventListener('change', () => {
 			const selectedValue = dropdown.value;
 			if (selectedValue) {
-				await this.plugin.setActiveUser(selectedValue);
-				new Notice(`Active user set to: ${this.plugin.getActiveParticipant()?.name}`);
+				void this.plugin.setActiveUser(selectedValue).then(() => {
+					new Notice(`Active user set to: ${this.plugin.getActiveParticipant()?.name}`);
+				});
 			}
 		});
 
 		// Add a button to clear active user if needed
 		const clearButtonContainer = container.createDiv({ attr: { style: 'margin-top: 8px;' } });
 		const clearButton = clearButtonContainer.createEl('button', {
-			text: 'Clear Active User',
+			text: 'Clear active user',
 			cls: 'mod-warning',
 			attr: { style: 'padding: 4px 8px; font-size: 0.9em;' }
 		});
 
-		clearButton.addEventListener('click', async () => {
-			await this.plugin.setActiveUser('');
-			dropdown.value = '';
-			new Notice('Active user cleared');
+		clearButton.addEventListener('click', () => {
+			void this.plugin.setActiveUser('').then(() => {
+				dropdown.value = '';
+				new Notice('Active user cleared');
+			});
 		});
 	}
 }
