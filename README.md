@@ -98,23 +98,34 @@ The plugin recognizes and creates both formats depending on your Obsidian settin
 
 ## Changelog
 
+### Version 1.2.2
+
+- Prevent `@` mention trigger for email addresses (only activates at start of line or after whitespace)
+- Add backspace dismissal for suggestion popup (first backspace closes popup, second deletes text)
+- Fix Enter selection in suggestion popup
+- Fix `@` at start of line activation
+
 ### Version 1.0.4
+
 - Moved active user selection to plugin settings (no longer stored in vault data)
 - Added active user dropdown directly in settings tab 
 - Removed redundant "Change Active User" command from command palette
 - Added ability to clear active user selection
 
 ### Version 1.0.3
+
 - Added search functionality for mentions of specific participants
 - Added search functionality for mentions of active user ("me")
 - Fixed various bugs with mention processing
 
 ### Version 1.0.2
+
 - Implemented automatic updating of mentions when participant information changes
 - Added participant management with add/edit/delete capabilities
 - Added ability to generate participants from existing mentions in vault
 
 ### Version 1.0.1
+
 - Initial release with participant management and @ mention tagging
 
 ## Notes
@@ -126,9 +137,12 @@ The plugin recognizes and creates both formats depending on your Obsidian settin
 
 ## Integration with External Plugins
 
-The plugin exposes public methods that allow other plugins to access the participant list:
+The plugin exposes public methods that allow other plugins to access the participant list.
 
-### For QuickAdd Integration
+- `getParticipants()`: Returns an array of Participant objects with id and name properties
+- `getParticipantNames()`: Returns an array of participant names as strings
+
+### QuickAdd Plugin
 
 You can now access the participant list from QuickAdd templates to dynamically populate your checkbox prompts:
 
@@ -157,11 +171,6 @@ if (plugin) {
   this.variables.participants = participantsYaml;
 }
 ```
-
-#### Public Methods Available
-
-- `getParticipants()`: Returns an array of Participant objects with id and name properties
-- `getParticipantNames()`: Returns an array of participant names as strings
 
 ## Future Enhancements
 
