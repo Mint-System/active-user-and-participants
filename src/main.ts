@@ -434,10 +434,25 @@ export default class ActiveUserAndParticipantsPlugin extends Plugin {
 class MentionEditorSuggest extends EditorSuggest<MentionSuggestion> {
 	private plugin: ActiveUserAndParticipantsPlugin;
 	private suppressNextTrigger: boolean = false;
+	private suppressReopen: boolean = false;
+	private suppressedAtQuery: string = '';
 
 	constructor(app: App, plugin: ActiveUserAndParticipantsPlugin) {
 		super(app);
 		this.plugin = plugin;
+
+		// Register backspace on the suggest scope so it only fires while the popup is open.
+		// The first backspace dismisses the popup without deleting text.
+		this.scope.register(null, 'Backspace', (evt: KeyboardEvent) => {
+			if (!this.suppressReopen) {
+				this.suppressReopen = true;
+				this.suppressedAtQuery = this.context?.query ?? '';
+			}
+			this.close();
+			evt.preventDefault();
+			evt.stopPropagation();
+			return false;
+		});
 	}
 
 	onTrigger(cursor: EditorPosition, editor: Editor, file: TFile | null): EditorSuggestTriggerInfo | null {
@@ -446,17 +461,34 @@ class MentionEditorSuggest extends EditorSuggest<MentionSuggestion> {
 			this.suppressNextTrigger = false;
 			return null;
 		}
-		
+
 		const currentLine = editor.getLine(cursor.line);
 		const beforeCursor = currentLine.slice(0, cursor.ch);
 
-		// Check if we're in an @ mention context
-		const match = beforeCursor.match(/@(\S*)$/);
-		if (match && match[1]) {
+		// Only trigger @ mentions at the start of a line or after whitespace,
+		// so typing an email address like info@example.com does not activate it.
+		const match = beforeCursor.match(/(?:^|\s)@(\S*)$/);
+		if (match) {
+			const query = match[1] || '';
+
+			if (this.suppressReopen) {
+				// If the query got longer (user typed a new character), allow reopening.
+				// Otherwise, keep suppressed and update the reference query.
+				if (query.length > this.suppressedAtQuery.length) {
+					this.suppressReopen = false;
+					this.suppressedAtQuery = '';
+				} else {
+					this.suppressedAtQuery = query;
+					return null;
+				}
+			}
+
+			// match[0] may include a preceding whitespace; calculate the exact position of @
+			const startCh = cursor.ch - match[0].length + (match[0].startsWith('@') ? 0 : 1);
 			return {
-				start: { line: cursor.line, ch: cursor.ch - match[0].length },
+				start: { line: cursor.line, ch: startCh },
 				end: cursor,
-				query: match[1],
+				query: query,
 			};
 		}
 
@@ -465,16 +497,16 @@ class MentionEditorSuggest extends EditorSuggest<MentionSuggestion> {
 
 	getSuggestions(context: EditorSuggestTriggerInfo): MentionSuggestion[] | Promise<MentionSuggestion[]> {
 		if (!this.plugin.settings.participants) return [];
-		
+
 		const query = context.query.toLowerCase();
-		const matchingParticipants = this.plugin.settings.participants.filter(participant => 
-			participant.id.toLowerCase().includes(query) || 
+		const matchingParticipants = this.plugin.settings.participants.filter(participant =>
+			participant.id.toLowerCase().includes(query) ||
 			participant.name.toLowerCase().includes(query)
 		).map(participant => ({
 			id: participant.id,
 			name: participant.name
 		}));
-		
+
 		// If there's a query but no matching participants, suggest creating a new participant
 		if (query && matchingParticipants.length === 0) {
 			// Suggest creating a new participant with the entered text as both id and name
@@ -484,7 +516,7 @@ class MentionEditorSuggest extends EditorSuggest<MentionSuggestion> {
 				name: query
 			});
 		}
-		
+
 		return matchingParticipants;
 	}
 
@@ -500,61 +532,61 @@ class MentionEditorSuggest extends EditorSuggest<MentionSuggestion> {
 		// Replace the @... text with the proper mention format
 		const leaf = this.app.workspace.activeLeaf;
 		if (!leaf || !(leaf.view instanceof MarkdownView)) return;
-		
+
 		const editor = leaf.view.editor;
-		
+
 		// Find the @ trigger position
 		const cursor = editor.getCursor();
 		const currentLine = editor.getLine(cursor.line);
 		const beforeCursor = currentLine.slice(0, cursor.ch);
 		const match = beforeCursor.match(/@(\S*)$/);
 		if (!match) return;
-		
+
 		const startCh = cursor.ch - match[0].length;
 		const endCh = cursor.ch;
-		
+
 		// If this is a new participant that doesn't exist yet (identified by NEW: prefix)
 		if (suggestion.id.startsWith('NEW:')) {
 			const newId = suggestion.id.substring(4); // Remove 'NEW:' prefix
-			
+
 			// Ask user if they want to create this participant
 			const shouldCreate = confirm(`"${suggestion.name}" is not in the participants list. Would you like to add them?`);
 			if (!shouldCreate) {
 				return; // User chose not to create, so just insert the text as-is
 			}
-			
+
 			// Add the new participant to the plugin's settings
 			const newParticipant = {
 				id: newId,
 				name: suggestion.name
 			};
-			
+
 			// Check if participant doesn't already exist
 			const exists = this.plugin.settings.participants.some(p => p.id === newParticipant.id || p.name === newParticipant.name);
 			if (!exists) {
 				this.plugin.settings.participants.push(newParticipant);
 				this.plugin.saveSettings();
 			}
-			
+
 			// Update the suggestion object to use the actual values without prefix
 			suggestion.id = newId;
 		}
-		
+
 		// Determine which format to use based on Obsidian's wikilink setting
 		// Check the "Use [[Wikilinks]]" setting in Obsidian
 		const vaultWithConfig = this.app.vault as any;
 		const useWikilinks = vaultWithConfig.getConfig ? !vaultWithConfig.getConfig('useMarkdownLinks') : true;
-		
+
 		let replacement: string;
 		if (useWikilinks) {
 			replacement = `@[[${suggestion.id}|${suggestion.name}]]`;
 		} else {
 			replacement = `@[${suggestion.name}](mention://${suggestion.id})`;
 		}
-		
+
 		// Replace the matched text
 		editor.replaceRange(replacement, { line: cursor.line, ch: startCh }, { line: cursor.line, ch: endCh });
-		
+
 		// Suppress the next trigger to prevent the suggestion from appearing again immediately after insertion
 		this.suppressNextTrigger = true;
 	}
